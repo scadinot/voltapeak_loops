@@ -1,0 +1,19 @@
+# Environnement virtuel Python (reproduit localement via `py -m venv .venv`).
+.venv/
+
+# Caches d'outils.
+__pycache__/
+.ruff_cache/
+.pytest_cache/
+.mypy_cache/
+
+# Artefacts d'installation editable (pip install -e .).
+*.egg-info/
+
+# Bytecode.
+*.pyc
+*.pyo
+
+# Fichiers de résultats produits par l'application (dossier "<source> (results)")
+# — exclusion volontairement laissée à l'utilisateur : certains souhaitent
+# versionner des jeux de résultats de référence.
