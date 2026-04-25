@@ -8,27 +8,9 @@ Ce document trace les axes d'évolution du projet. Il est organisé en **jalons*
 |----------|---------------------------------|
 | `[ ]`    | À faire                         |
 | `[~]`    | En cours                        |
-| `[x]`    | Terminé                         |
 | **P0**   | Priorité haute (court terme)    |
 | **P1**   | Priorité moyenne (moyen terme)  |
 | **P2**   | Priorité basse (long terme)     |
-
----
-
-## Jalon 0 — État actuel (v0.1)
-
-Fonctionnalités déjà livrées, considérées stables :
-
-- `[x]` Interface graphique Tkinter mono-fenêtre avec sélection de dossier.
-- `[x]` Paramètres de lecture configurables (séparateur colonnes, séparateur décimal).
-- `[x]` Lissage Savitzky-Golay.
-- `[x]` Détection de pic avec filtre de pente.
-- `[x]` Correction de baseline asPLS Whittaker avec zone d'exclusion.
-- `[x]` Export optionnel par fichier : PNG 300 dpi, CSV, XLSX.
-- `[x]` Agrégation Excel hiérarchique (MultiIndex Canal / Fréquence / Mesure).
-- `[x]` Multiprocessing sur `cpu_count()` cœurs, feedback temps réel.
-- `[x]` Multiplateforme (Windows, macOS, Linux).
-- `[x]` Documentation : README.md, ROADMAP.md, docstrings et commentaires français dans le code.
 
 ---
 
@@ -36,7 +18,6 @@ Fonctionnalités déjà livrées, considérées stables :
 
 L'objectif de ce jalon est de rendre le projet **industrialisable** : dépendances déclarées, tests en place, code modularisé.
 
-- `[x]` **`pyproject.toml` PEP 621** livré — section `[project]` avec dépendances (`numpy`, `pandas`, `scipy`, `matplotlib`, `pybaselines`, `openpyxl`). Versions non pinnées à ce stade (cf. Jalon 5).
 - `[ ]` **Modulariser** le script unique en un package :
     - `io.py` — lecture des fichiers SWV ;
     - `signal.py` — lissage, détection de pic, correction de baseline ;
@@ -44,7 +25,6 @@ L'objectif de ce jalon est de rendre le projet **industrialisable** : dépendanc
     - `gui.py` — interface Tkinter ;
     - `__main__.py` — point d'entrée.
 - `[ ]` **Nettoyer** :
-    - retirer l'import `gc` inutilisé ;
     - homogénéiser la casse (`camelCase` vs `snake_case` — choisir une convention).
 - `[~]` **Pyright / annotations de type** — Pyright configuré dans `pyproject.toml` (`[tool.pyright]` avec `venvPath`/`venv` local). Annotations à compléter fonction par fonction pour viser un run sans warning. `mypy --strict` reste à arbitrer.
 - `[ ]` **Tests unitaires** (`pytest`) :
