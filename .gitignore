@@ -1,19 +1,32 @@
-# Environnement virtuel Python (reproduit localement via `py -m venv .venv`).
-.venv/
+# IDE / outils
+/.claude
+/.ruff_cache
+/.vscode
 
-# Caches d'outils.
+# Python
 __pycache__/
-.ruff_cache/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+
+# Distribution / build
+build/
+dist/
+*.spec
+
+# Environnements virtuels
+.venv/
+venv/
+env/
+
+# Tests / cache
 .pytest_cache/
 .mypy_cache/
+.coverage
+htmlcov/
 
-# Artefacts d'installation editable (pip install -e .).
-*.egg-info/
-
-# Bytecode.
-*.pyc
-*.pyo
-
-# Fichiers de résultats produits par l'application (dossier "<source> (results)")
-# — exclusion volontairement laissée à l'utilisateur : certains souhaitent
-# versionner des jeux de résultats de référence.
+# Sorties matplotlib courantes
+*.png
+*.pdf
+*.svg

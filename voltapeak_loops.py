@@ -43,6 +43,7 @@ from multiprocessing import Pool, cpu_count, freeze_support
 from tkinter import Button, Frame, IntVar, Label, Radiobutton, StringVar, Text, Tk, filedialog, messagebox, ttk
 
 import matplotlib
+from numpy.typing import NDArray
 
 # Backend non-interactif : OBLIGATOIRE.
 #   * En multi-process : les workers n'ont pas accès au thread Tk principal,
@@ -120,7 +121,7 @@ def processData(dataFrame) -> tuple:
     signalValues = -dataFrame["Current"].values  # Inversion du courant
     return potentialValues, signalValues, dataFrame
 
-def smoothSignal(signalValues) -> np.ndarray:
+def smoothSignal(signalValues: NDArray[np.float64]) -> NDArray[np.float64]:
     """Applique un lissage Savitzky-Golay au signal.
 
     Les paramètres (fenêtre de 11 points, polynôme d'ordre 2) constituent un
@@ -133,7 +134,7 @@ def smoothSignal(signalValues) -> np.ndarray:
     Returns:
         numpy.ndarray: Signal lissé, de même dimension que l'entrée.
     """
-    return savgol_filter(signalValues, window_length=11, polyorder=2)
+    return np.asarray(savgol_filter(signalValues, window_length=11, polyorder=2))
 
 def getPeakValue(signalValues, potentialValues, marginRatio=0.10, maxSlope=None) -> tuple:
     """Localise le pic principal du signal dans la région centrale.
