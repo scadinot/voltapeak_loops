@@ -9,8 +9,7 @@
 # -----------------------------------------------------------------------------
 
 [MAIN]
-# Codes pylint désactivés — choix assumés du projet, voir commentaires
-# ci-dessous pour les justifications.
+# Les codes ci-dessous correspondent aux règles pylint à désactiver.
 disable=C0103,
         C0301,
         C0412,
@@ -21,7 +20,7 @@ disable=C0103,
         R0915,
         R0917,
         W0718
-# C0103 : invalid-name — camelCase volontaire (cohérence interne GROUPE TRACE).
+# C0103 : invalid-name — camelCase volontaire
 # C0301 : line-too-long — cohérent avec ruff (line-length=120).
 # C0412 : ungrouped-imports — `import matplotlib` et `import matplotlib.pyplot`
 #         sont volontairement séparés par `matplotlib.use('Agg')` (cf. C0413).
