@@ -23,10 +23,11 @@ par expression régulière, en respectant le format : ``*_XX_SWV_CYY_loopZZ.txt`
 
 Point d'entrée
 --------------
-Lancer ``python voltapeak_loops.py`` ouvre une interface graphique Tkinter.
-Le traitement s'effectue par défaut en parallèle sur tous les cœurs CPU
-disponibles via ``multiprocessing.Pool`` ; un mode séquentiel est sélectionnable
-dans la GUI (utile pour le débogage).
+Lancer ``python -m voltapeak_loops`` (depuis le dossier parent du package)
+ouvre une interface graphique Tkinter. Le traitement s'effectue par défaut
+en parallèle sur tous les cœurs CPU disponibles via
+``multiprocessing.Pool`` ; un mode séquentiel est sélectionnable dans la
+GUI (utile pour le débogage).
 
 Dépendances principales
 -----------------------

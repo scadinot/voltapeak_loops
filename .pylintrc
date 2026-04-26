@@ -1,0 +1,39 @@
+# -----------------------------------------------------------------------------
+# .pylintrc — Configuration Pylint (format INI).
+#
+# Extrait de l'ancien `[tool.pylint.*]` de pyproject.toml. En INI, les
+# noms de section deviennent MAIN / FORMAT / etc. (en majuscules).
+#
+# Mêmes tolérances que ruff : camelCase assumé pour les noms de fonctions,
+# variables, arguments (cohérence avec les conventions internes GROUPE TRACE).
+# -----------------------------------------------------------------------------
+
+[MAIN]
+# Codes pylint désactivés — choix assumés du projet, voir commentaires
+# ci-dessous pour les justifications.
+disable=C0103,
+        C0301,
+        C0412,
+        C0413,
+        R0912,
+        R0913,
+        R0914,
+        R0915,
+        R0917,
+        W0718
+# C0103 : invalid-name — camelCase volontaire (cohérence interne GROUPE TRACE).
+# C0301 : line-too-long — cohérent avec ruff (line-length=120).
+# C0412 : ungrouped-imports — `import matplotlib` et `import matplotlib.pyplot`
+#         sont volontairement séparés par `matplotlib.use('Agg')` (cf. C0413).
+# C0413 : wrong-import-position — `matplotlib.use('Agg')` doit s'intercaler
+#         entre `import matplotlib` et `import matplotlib.pyplot`.
+# R0912-R0917 : seuils arbitraires non pertinents pour un script
+#         scientifique + GUI : `launch_gui` concentre toutes les déclarations
+#         de widgets et `plotSignalAnalysis` passe volontairement tous les
+#         tracés en arguments.
+# W0718 : broad-exception-caught — `processSignalFile` capture toute exception
+#         pour retourner {"error": ...} et laisser le Pool continuer à traiter
+#         les autres fichiers en cas d'échec ponctuel.
+
+[FORMAT]
+max-line-length=120

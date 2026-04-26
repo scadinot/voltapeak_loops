@@ -94,29 +94,26 @@ python -m venv .venv
 # macOS / Linux :
 source .venv/bin/activate
 
-# 3. Installer les dépendances — trois options au choix :
+# 3. Installer les dépendances — deux options au choix :
 
-# 3.A (recommandé pour utilisateur final) : versions figées et testées
+# 3.A (recommandé) : versions figées et testées
 pip install -r requirements.txt
 
-# 3.B (mode développement, install editable depuis pyproject.toml)
-# pip install -e .
-
-# 3.C (fallback explicite, sans pyproject.toml ni requirements.txt)
+# 3.B (fallback explicite, sans requirements.txt)
 # pip install numpy pandas scipy matplotlib pybaselines openpyxl
 
-# 4. Lancer l'application
-python voltapeak_loops.py
+# 4. Lancer l'application — depuis le dossier *parent* du projet
+cd ..
+python -m voltapeak_loops
 ```
 
 > **Quand utiliser laquelle ?**
-> - **3.A** — l'utilisateur veut juste *exécuter* le programme. Le `requirements.txt` épingle les versions exactes (`~=`) sur lesquelles l'outil a été validé : pas de mauvaise surprise sur une version récente cassante.
-> - **3.B** — vous *développez* sur le projet. `pip install -e .` lit `pyproject.toml` (sans contrainte de version, donc dernières releases) et expose le code en mode editable : modifier un fichier prend effet sans réinstall.
-> - **3.C** — fallback de dépannage si ni `requirements.txt` ni `pyproject.toml` n'est exploitable.
+> - **3.A** — voie standard. Le `requirements.txt` épingle les versions exactes (`~=`) sur lesquelles l'outil a été validé : pas de mauvaise surprise sur une version récente cassante.
+> - **3.B** — fallback de dépannage si `requirements.txt` n'est pas exploitable (par exemple, environnement réseau restreint avec un miroir PyPI partiel).
 
 ### Intégration IDE (VS Code / Pylance / Pyright)
 
-Le projet déclare dans [`pyproject.toml`](pyproject.toml) (`[tool.pyright]`) les clefs `venvPath = "."` et `venv = ".venv"` : **Pylance et `pyright` CLI lisent automatiquement le `.venv` créé ci-dessus**, sans configuration supplémentaire.
+Le projet déclare dans [`pyrightconfig.json`](pyrightconfig.json) les clefs `venvPath = "."` et `venv = ".venv"` : **Pylance et `pyright` CLI lisent automatiquement le `.venv` créé ci-dessus**, sans configuration supplémentaire.
 
 Un fichier [`.vscode/settings.json`](.vscode/settings.json) pointe également l'extension Python de VS Code vers `${workspaceFolder}/.venv/Scripts/python.exe` (chemin relatif portable). Si VS Code ne détecte pas l'environnement à l'ouverture du dossier, forcer la sélection via `Ctrl+Shift+P` → **Python: Select Interpreter** → `.venv/Scripts/python.exe`.
 
@@ -159,10 +156,10 @@ run2_15_SWV_C12_loop10.txt
 
 ## Utilisation — interface graphique
 
-Lancer l'application :
+Lancer l'application depuis le dossier *parent* du projet :
 
 ```bash
-python voltapeak_loops.py
+python -m voltapeak_loops
 ```
 
 La fenêtre comporte cinq zones :
@@ -290,7 +287,14 @@ Les constantes ci-dessous sont actuellement **codées en dur** dans le script. U
 
 ## Architecture logicielle
 
-Le projet tient actuellement dans un fichier unique, [`voltapeak_loops.py`](voltapeak_loops.py). Le chaînage des appels est le suivant :
+Le projet est un package Python à deux fichiers :
+
+| Fichier | Rôle |
+|---------|------|
+| [`__init__.py`](__init__.py) | Métadonnées du package (`__version__`) — marque le dossier comme package Python et permet `python -m voltapeak_loops`. |
+| [`__main__.py`](__main__.py) | Code applicatif complet (toutes les fonctions du pipeline + GUI Tkinter + entry point `main()`). |
+
+Le chaînage des appels est le suivant :
 
 ```
 main()
@@ -345,7 +349,7 @@ Sinon, laissez le multi-thread activé : le gain est typiquement de l'ordre du n
 Vérifier que leur nom respecte exactement le motif `*_XX_SWV_CYY_loopZZ.txt` (variante et canal **obligatoirement** sur deux chiffres). Tout nom non conforme est filtré silencieusement par la regex.
 
 **Q. Erreur « UnicodeDecodeError » à la lecture.**
-Le script force l'encodage `latin1`. Si vos fichiers sont en UTF-8 avec BOM ou autre encodage exotique, adapter le paramètre `encoding` dans [`readFile`](voltapeak_loops.py).
+Le script force l'encodage `latin1`. Si vos fichiers sont en UTF-8 avec BOM ou autre encodage exotique, adapter le paramètre `encoding` dans [`readFile`](__main__.py).
 
 **Q. Les colonnes du CSV ne sont pas lues correctement.**
 Vérifier dans la GUI le choix du *Séparateur de colonnes* et du *Séparateur décimal*. La plupart des appareils européens produisent de la tabulation avec décimale virgule.
@@ -367,7 +371,7 @@ La fenêtre Tkinter est rafraîchie après chaque fichier traité : si l'un de v
 
 **Q. Pylance souligne en rouge les imports (`matplotlib`, `numpy`, `pandas`, `pybaselines`, `scipy`) avec l'erreur `reportMissingImports`, alors que le script s'exécute correctement.**
 Pylance (ou `pyright` CLI) n'a pas trouvé l'interpréteur Python contenant les dépendances. Deux causes classiques :
-1. Le `.venv` du projet n'existe pas → le créer et y installer les dépendances (cf. [Installation](#installation)). `pyproject.toml` déclare déjà `venvPath = "."` / `venv = ".venv"` : une fois le venv en place, Pyright le détecte automatiquement.
+1. Le `.venv` du projet n'existe pas → le créer et y installer les dépendances (cf. [Installation](#installation)). `pyrightconfig.json` déclare déjà `venvPath = "."` / `venv = ".venv"` : une fois le venv en place, Pyright le détecte automatiquement.
 2. Sous Windows, VS Code utilise par défaut l'alias du Microsoft Store comme `python.exe`, qui ne résout aucun import → ouvrir la palette de commandes (`Ctrl+Shift+P`), choisir *Python: Select Interpreter* et sélectionner `.venv/Scripts/python.exe` (ou à défaut un Python complet installé depuis [python.org](https://python.org)).
 
 ---

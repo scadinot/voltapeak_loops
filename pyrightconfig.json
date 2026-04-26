@@ -1,0 +1,18 @@
+{
+    "//": "Configuration Pyright / Pylance — extraite de l'ancien [tool.pyright] de pyproject.toml.",
+
+    "pythonVersion": "3.10",
+
+    "//venv": "Venv local à la racine du projet : Pyright (et Pylance) y lit directement les paquets installés. À créer via `py -m venv .venv` puis `pip install -r requirements.txt`.",
+    "venvPath": ".",
+    "venv": ".venv",
+
+    "//reportMissingModuleSource": "désactivé pour openpyxl (pas de stubs publiés côté source).",
+    "reportMissingModuleSource": "none",
+
+    "//reportPrivateImportUsage": "désactivé — certains symboles matplotlib / scipy sont considérés comme re-exports privés par Pyright alors qu'ils sont documentés.",
+    "reportPrivateImportUsage": "none",
+
+    "//reportMissingTypeStubs": "les bibliothèques scientifiques n'ont pas toutes des stubs officiels — on n'en fait pas un blocage.",
+    "reportMissingTypeStubs": "none"
+}

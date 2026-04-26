@@ -62,7 +62,7 @@ avec sorties attendues :
 
 ### 3. Compléter les annotations de type
 
-**Motivation.** Pyright est déjà configuré (`[tool.pyright]` avec
+**Motivation.** Pyright est déjà configuré (`pyrightconfig.json` avec
 `venvPath`/`venv` local), mais les fonctions ne sont annotées qu'en
 surface — `processData(dataFrame) -> tuple`, `readFile(filePath, sep,
 decimal)` sans typer les arguments. Pyright ne peut donc détecter
@@ -209,17 +209,25 @@ la prochaine campagne.
 - build matriciel Windows / macOS / Linux de l'exécutable
   PyInstaller à chaque tag git.
 
-### 13. Pinner les versions de dépendances
+### 13. Verrouillage exact des versions (lockfile)
 
-**Motivation.** `pyproject.toml` liste les dépendances **sans
-contrainte de version**. Une mise à jour cassante (`numpy 2.0`,
-`pandas 3.0`, `matplotlib 4.0`) pourrait casser silencieusement un
-déploiement reproduit dans un nouveau venv plusieurs mois plus tard.
+**Motivation.** `requirements.txt` épingle aujourd'hui les dépendances
+en **compatible-release** (`~=`) — les patches sont autorisés mais pas
+les versions mineures cassantes. Pour une reproductibilité bit-à-bit
+(audit, packaging, CI déterministe), il faut un *lockfile* avec
+versions exactes (`==`) **et** versions transitives résolues.
 
-**Piste technique.** Une fois un set validé sur plusieurs campagnes,
-figer via `pip freeze > requirements.lock.txt`, ou via PEP 735
-(`[dependency-groups]` dans `pyproject.toml`), ou via l'écosystème
-[`uv`](https://docs.astral.sh/uv/) avec son `uv.lock`.
+**Piste technique.** Trois pistes au choix :
+
+- **`pip freeze > requirements.lock.txt`** — simple, mais demande de
+  séparer manuellement les deps directes (`requirements.txt`,
+  édition humaine) des deps transitives (`requirements.lock.txt`,
+  généré).
+- **[`pip-tools`](https://github.com/jazzband/pip-tools)** —
+  `requirements.in` (humain) → `pip-compile` → `requirements.txt`
+  (lockfile généré, deps transitives incluses, hashes optionnels).
+- **[`uv`](https://docs.astral.sh/uv/)** — alternative moderne, plus
+  rapide, génère un `uv.lock` au format TOML structuré.
 
 ### 14. Autres techniques électrochimiques
 
