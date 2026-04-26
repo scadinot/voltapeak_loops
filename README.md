@@ -94,15 +94,25 @@ python -m venv .venv
 # macOS / Linux :
 source .venv/bin/activate
 
-# 3. Installer les dépendances (option A : depuis pyproject.toml, recommandé)
-pip install -e .
+# 3. Installer les dépendances — trois options au choix :
 
-# 3 bis. (option B : installation explicite si pyproject.toml n'est pas utilisé)
+# 3.A (recommandé pour utilisateur final) : versions figées et testées
+pip install -r requirements.txt
+
+# 3.B (mode développement, install editable depuis pyproject.toml)
+# pip install -e .
+
+# 3.C (fallback explicite, sans pyproject.toml ni requirements.txt)
 # pip install numpy pandas scipy matplotlib pybaselines openpyxl
 
 # 4. Lancer l'application
 python voltapeak_loops.py
 ```
+
+> **Quand utiliser laquelle ?**
+> - **3.A** — l'utilisateur veut juste *exécuter* le programme. Le `requirements.txt` épingle les versions exactes (`~=`) sur lesquelles l'outil a été validé : pas de mauvaise surprise sur une version récente cassante.
+> - **3.B** — vous *développez* sur le projet. `pip install -e .` lit `pyproject.toml` (sans contrainte de version, donc dernières releases) et expose le code en mode editable : modifier un fichier prend effet sans réinstall.
+> - **3.C** — fallback de dépannage si ni `requirements.txt` ni `pyproject.toml` n'est exploitable.
 
 ### Intégration IDE (VS Code / Pylance / Pyright)
 
