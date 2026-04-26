@@ -15,11 +15,24 @@ Pour chaque fichier ``.txt`` trouvé dans un dossier, le script :
     7. exporte optionnellement un graphique PNG, un CSV ou un XLSX par fichier.
 
 Les résultats de tous les fichiers sont agrégés dans un unique classeur Excel
-hiérarchique (MultiIndex : Canal / Fréquence / Mesure), une ligne par itération.
+hiérarchique (MultiIndex : Canal / Variante / Mesure), une ligne par itération.
 
-Les métadonnées (variante, canal, itération) sont extraites du nom de fichier
-par expression régulière, en respectant le format : ``*_XX_SWV_CYY_loopZZ.txt``
-(XX = variante sur 2 chiffres, YY = canal sur 2 chiffres, ZZ = itération).
+Deux formats de noms de fichiers sont supportés (détection automatique) :
+
+* **Format "loops"** : ``*_XX_SWV_CYY_loopZZ.txt``
+    - ``XX`` = variante sur 2 chiffres (ex. fréquence)
+    - ``CYY`` = identifiant de canal (ex. C09)
+    - ``loopZZ`` = index d'itération (suffixe)
+
+* **Format "dosage"** : ``ZZ_<concentration>_XX_SWV_CYY.txt``
+    - ``ZZ`` = ordre dans la série de dosage (préfixe, sert au tri)
+    - ``<concentration>`` = libellé de concentration (ex. ``0nm``, ``250nm``)
+    - ``XX`` = variante sur 2 chiffres (réplica)
+    - ``CYY`` = identifiant de canal
+
+Pour le format "dosage", l'index de ligne du tableau Excel final affiche la
+concentration uniquement, mais le tri est effectué selon ``ZZ`` pour
+préserver l'ordre expérimental.
 
 Point d'entrée
 --------------
@@ -60,6 +73,13 @@ import numpy as np # type: ignore
 import pandas as pd
 from pybaselines.whittaker import aspls # type: ignore
 from scipy.signal import savgol_filter # type: ignore
+
+
+# Expressions régulières pour les deux formats supportés.
+# Le format "loops" est testé en premier car il est plus restrictif (présence
+# explicite du suffixe `_loopZZ`). Le format "dosage" sert ensuite de fallback.
+RE_LOOPS = re.compile(r".*?_([0-9]{2})_SWV_(C[0-9]{2})_loop([0-9]+)\.txt$")
+RE_DOSAGE = re.compile(r"^([0-9]+)_([^_]+)_([0-9]{2})_SWV_(C[0-9]{2})\.txt$")
 
 
 def open_folder(path):
@@ -253,6 +273,51 @@ def plotSignalAnalysis(potentialValues, signalValues, signalSmoothed, baseline, 
     plt.savefig(outputPath, dpi=300, bbox_inches='tight')
     plt.close()
 
+def parseFileName(fileName) -> dict | None:
+    """Extrait les métadonnées d'un nom de fichier SWV.
+
+    Tente d'abord le format "loops" (suffixe ``_loopZZ``), puis le format
+    "dosage" (préfixe ``ZZ_<concentration>_``).
+
+    Args:
+        fileName (str): Nom du fichier (basename, sans chemin).
+
+    Returns:
+        dict | None: Dictionnaire contenant :
+            * ``'format'`` : ``'loops'`` ou ``'dosage'``
+            * ``'iteration_key'`` : clé numérique pour le tri (int)
+            * ``'iteration_label'`` : libellé affiché en index Excel (str)
+            * ``'variante'`` : variante sur 2 chiffres (str)
+            * ``'canal'`` : identifiant canal (str, ex. ``'C09'``)
+
+        Retourne ``None`` si aucun format ne correspond.
+    """
+    # Format "loops" : *_XX_SWV_CYY_loopZZ.txt
+    m = RE_LOOPS.match(fileName)
+    if m:
+        variante, canal, loop = m.group(1), m.group(2), m.group(3)
+        return {
+            'format': 'loops',
+            'iteration_key': int(loop),
+            'iteration_label': f"loop{loop}",
+            'variante': variante,
+            'canal': canal,
+        }
+
+    # Format "dosage" : ZZ_<concentration>_XX_SWV_CYY.txt
+    m = RE_DOSAGE.match(fileName)
+    if m:
+        ordre, concentration, variante, canal = m.group(1), m.group(2), m.group(3), m.group(4)
+        return {
+            'format': 'dosage',
+            'iteration_key': int(ordre),
+            'iteration_label': concentration,  # affichage : concentration uniquement
+            'variante': variante,
+            'canal': canal,
+        }
+
+    return None
+
 def processFileWrapper(args):
     """Adaptateur pour ``multiprocessing.Pool.imap``.
 
@@ -271,15 +336,10 @@ def processFileWrapper(args):
 def processSignalFile(filePath, outputFolder, sep, decimal, export_processed, export_graph) -> dict | None:
     """Traite un unique fichier SWV de bout en bout (fonction métier centrale).
 
-    Enchaîne : lecture → extraction des métadonnées par regex → nettoyage
-    → lissage Savitzky-Golay → détection de pic → correction de baseline
-    asPLS → extraction du pic corrigé → exports optionnels.
-
-    Le nom de fichier doit respecter le format
-    ``*_XX_SWV_CYY_loopZZ.txt`` pour être accepté :
-        * ``XX`` : variante (2 chiffres, typiquement une fréquence) ;
-        * ``CYY`` : identifiant de canal (ex. ``C00``, ``C01``) ;
-        * ``loopZZ`` : index d'itération (1..N).
+    Enchaîne : lecture → extraction des métadonnées par regex (deux formats
+    supportés, voir :func:`parseFileName`) → nettoyage → lissage
+    Savitzky-Golay → détection de pic → correction de baseline asPLS →
+    extraction du pic corrigé → exports optionnels.
 
     Args:
         filePath (str): Chemin absolu du fichier ``.txt`` à traiter.
@@ -291,11 +351,12 @@ def processSignalFile(filePath, outputFolder, sep, decimal, export_processed, ex
 
     Returns:
         dict | None: Dictionnaire contenant :
-            * ``'loop'`` → identifiant d'itération (ex. ``"loop3"``),
+            * ``'iteration_key'`` → clé numérique pour le tri (int),
+            * ``'iteration_label'`` → libellé d'itération affiché (str),
             * ``"{canal} - {variante} - Tension (V)"`` → tension du pic,
             * ``"{canal} - {variante} - Courant (A)"`` → courant du pic.
 
-        Retourne ``None`` si le nom ne correspond pas au motif attendu.
+        Retourne ``None`` si le nom ne correspond à aucun format reconnu.
         En cas d'exception, retourne ``{"error": "..."}`` pour affichage.
     """
     try:
@@ -304,17 +365,12 @@ def processSignalFile(filePath, outputFolder, sep, decimal, export_processed, ex
         if dataFrame is None:
             return None
 
-        # Extraction canal, variante et loop (itération) du nom de fichier
-        # Motif attendu : *_XX_SWV_CYY_loopZZ.txt
-        #   XX  = variante sur 2 chiffres (ex. fréquence)
-        #   CYY = identifiant canal (ex. C00)
-        #   ZZ  = numéro d'itération
-        m = re.match(r".*?_([0-9]{2})_SWV_(C[0-9]{2})_loop([0-9]+)\.txt$", fileName)
-
-        if not m:
+        meta = parseFileName(fileName)
+        if meta is None:
             return None
 
-        variante, canal, loop = m.group(1), m.group(2), m.group(3)
+        variante = meta['variante']
+        canal = meta['canal']
 
         potentialValues, signalValues, cleaned_df = processData(dataFrame)
         signalSmoothed = smoothSignal(signalValues)
@@ -332,7 +388,8 @@ def processSignalFile(filePath, outputFolder, sep, decimal, export_processed, ex
             cleaned_df.to_excel(os.path.join(outputFolder, fileName.replace(".txt", ".xlsx")), index=False)
 
         return {
-            'loop': f"loop{loop}",
+            'iteration_key': meta['iteration_key'],
+            'iteration_label': meta['iteration_label'],
             f"{canal} - {variante} - Tension (V)": xCorrectedVoltage,
             f"{canal} - {variante} - Courant (A)": yCorrectedCurrent,
         }
@@ -467,19 +524,29 @@ def launch_gui():
             progress_bar["value"] = i + 1
             root.update_idletasks()
 
-        # Organisation finale : table pivotée par itération/loop et colonnes multi-analyses
+        # Organisation finale : table pivotée par itération et colonnes multi-analyses
         if results:
             df = pd.DataFrame(results)
 
-            # Fusionne toutes les colonnes d'un même loop sur une seule ligne :
-            # chaque combinaison (canal, variante) devient une colonne distincte,
-            # l'itération `loopN` devient l'index de ligne du tableau final.
-            def key_loop(x):
-                m = re.match(r'loop(\d+)', x)
-                return int(m.group(1)) if m else 99999
+            # Regroupement par itération : chaque combinaison (canal, variante)
+            # devient une colonne distincte ; l'itération devient l'index de
+            # ligne du tableau final.
+            #
+            # On agrège sur 'iteration_label' (le libellé affiché : "loop3" ou
+            # "0nm" selon le format), mais on conserve 'iteration_key' (le
+            # numéro brut) pour effectuer le tri numérique correct.
+            #
+            # `first()` est utilisé car chaque (iteration, canal, variante)
+            # n'apparaît qu'une fois ; c'est juste un moyen d'aplatir la
+            # structure en un tableau pivot.
+            df_grouped = df.groupby('iteration_label', sort=False).first()
 
-            df_grouped = df.groupby('loop', sort=False).first()
-            df_grouped = df_grouped.sort_index(key=lambda x: x.map(key_loop))
+            # Tri par la clé numérique de l'itération (loop0, loop1... ou 1, 2, 3...)
+            df_grouped = df_grouped.sort_values('iteration_key')
+
+            # La colonne 'iteration_key' n'a plus besoin d'apparaître dans
+            # le résultat final : elle a servi uniquement au tri.
+            df_grouped = df_grouped.drop(columns=['iteration_key'])
 
             # Tri des colonnes (canal, variante, Tension avant Courant)
             def key_col(col):
@@ -493,7 +560,7 @@ def launch_gui():
             df_grouped = df_grouped[mesure_cols_triees]
 
             # Construction d'un en-tête Excel hiérarchique à trois niveaux :
-            #   Canal (C00..C99) > Fréquence (variante) > Mesure (Tension/Courant).
+            #   Canal (C00..C99) > Variante (fréquence ou réplica) > Mesure (Tension/Courant).
             # Rend le classeur de sortie bien plus lisible qu'une colonne plate.
             new_cols = []
             for col in df_grouped.columns:
@@ -503,7 +570,7 @@ def launch_gui():
                     new_cols.append((canal, variante, mesure))
                 else:
                     new_cols.append(("", "", col))
-            df_grouped.columns = pd.MultiIndex.from_tuples(new_cols, names=["Canal", "Fréquence", "Mesure"])
+            df_grouped.columns = pd.MultiIndex.from_tuples(new_cols, names=["Canal", "Variante", "Mesure"])
 
             excel_path = os.path.join(outputFolder, folderName + ".xlsx")
             df_grouped.to_excel(excel_path, index=True, index_label="Itération")
