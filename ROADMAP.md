@@ -58,7 +58,7 @@ avec sorties attendues :
   `numpy.testing.assert_allclose`) ;
 - test bout-en-bout sur `processSignalFile` à partir d'une fixture ;
 - test d'intégration sur l'agrégation Excel (lecture du XLSX,
-  vérification du MultiIndex Canal / Fréquence / Mesure).
+  vérification du MultiIndex Canal / Variante / Mesure).
 
 ### 3. Compléter les annotations de type
 
@@ -107,17 +107,31 @@ type d'expérience) sauvegardés dans `~/.voltapeak_loops/profiles/*.json`.
 
 ### 6. Validation amont du nommage et regex configurable
 
-**Motivation.** Les fichiers ne respectant pas le motif
-`*_XX_SWV_CYY_loopZZ.txt` sont **silencieusement ignorés** : un
-opérateur peut découvrir trop tard que la moitié de ses fichiers n'a
-pas été traitée. Et la regex elle-même est figée — un autre laboratoire
-avec une convention proche doit modifier le code.
+**Motivation.** Deux formats de noms de fichiers sont aujourd'hui
+supportés (`loops` et `dosage`, cf. README), mais aucun pré-contrôle
+n'inventorie le dossier avant l'analyse : les fichiers ne respectant
+**aucun** des deux motifs sont silencieusement ignorés, et un
+opérateur peut découvrir trop tard que la moitié de ses fichiers
+n'a pas été traitée. La détection d'un dossier mixte
+(loops + dosage côte à côte) intervient également *a posteriori*, en
+fin d'analyse — toute la chaîne de calcul est exécutée pour rien
+avant que l'export Excel soit annulé. Enfin, les regex elles-mêmes
+sont figées dans le code : un autre laboratoire avec une convention
+de nommage proche mais distincte doit forker le module.
 
-**Piste technique.** Avant le lancement, scanner le dossier et lister
-dans le journal les fichiers conformes/rejetés avec la cause (regex,
-encodage, colonnes manquantes). Exposer la regex dans le `config.toml`
-de l'item 5, avec groupes nommés (`(?P<variante>…)`, `(?P<canal>…)`,
-`(?P<loop>…)`), et fournir 2-3 patterns prêts à l'emploi.
+**Piste technique.** Avant le lancement, scanner le dossier et
+lister dans le journal :
+- les fichiers conformes par format (loops / dosage / autre) ;
+- les fichiers rejetés avec la cause (regex, encodage, colonnes
+  manquantes).
+
+Lever l'erreur de format mixte **avant** de démarrer le traitement
+(au moment du scan), pas après agrégation.
+
+Exposer dans le `config.toml` de l'item 5 une **liste de regex par
+format** plutôt qu'une seule (groupes nommés `(?P<variante>…)`,
+`(?P<canal>…)`, `(?P<iteration>…)`, `(?P<format>…)` etc.), avec
+2-3 patterns prêts à l'emploi.
 
 ### 7. Annulation et prévisualisation interactive
 
@@ -265,7 +279,7 @@ seul, ce qui invalide l'analyse pour ces cas.
 avec seuil de prominence ; ajustement gaussien ou lorentzien pour la
 séparation/intégration. Nouvelles colonnes dans le récapitulatif
 Excel pour le 2ème pic, 3ème pic… L'en-tête MultiIndex (Canal /
-Fréquence / Mesure) accueille naturellement ce niveau supplémentaire.
+Variante / Mesure) accueille naturellement ce niveau supplémentaire.
 
 ### 17. Calibration et étalonnage
 

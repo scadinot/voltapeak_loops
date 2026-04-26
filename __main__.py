@@ -78,6 +78,12 @@ from scipy.signal import savgol_filter # type: ignore
 # Expressions régulières pour les deux formats supportés.
 # Le format "loops" est testé en premier car il est plus restrictif (présence
 # explicite du suffixe `_loopZZ`). Le format "dosage" sert ensuite de fallback.
+#
+# Asymétrie d'ancrage volontaire :
+#   * RE_LOOPS utilise `.*?_` pour tolérer un préfixe d'expérience arbitraire
+#     (ex. "i-t 3-CypA_") avant la variante.
+#   * RE_DOSAGE est strictement ancré (`^`) car l'ordre numérique est toujours
+#     en première position du nom, sans préfixe possible.
 RE_LOOPS = re.compile(r".*?_([0-9]{2})_SWV_(C[0-9]{2})_loop([0-9]+)\.txt$")
 RE_DOSAGE = re.compile(r"^([0-9]+)_([^_]+)_([0-9]{2})_SWV_(C[0-9]{2})\.txt$")
 
@@ -351,6 +357,9 @@ def processSignalFile(filePath, outputFolder, sep, decimal, export_processed, ex
 
     Returns:
         dict | None: Dictionnaire contenant :
+            * ``'format'`` → ``'loops'`` ou ``'dosage'`` (str), utilisé en
+              aval pour valider qu'un même dossier ne mélange pas les deux
+              formats et pour adapter le libellé d'index Excel,
             * ``'iteration_key'`` → clé numérique pour le tri (int),
             * ``'iteration_label'`` → libellé d'itération affiché (str),
             * ``"{canal} - {variante} - Tension (V)"`` → tension du pic,
@@ -388,6 +397,7 @@ def processSignalFile(filePath, outputFolder, sep, decimal, export_processed, ex
             cleaned_df.to_excel(os.path.join(outputFolder, fileName.replace(".txt", ".xlsx")), index=False)
 
         return {
+            'format': meta['format'],
             'iteration_key': meta['iteration_key'],
             'iteration_label': meta['iteration_label'],
             f"{canal} - {variante} - Tension (V)": xCorrectedVoltage,
@@ -528,6 +538,41 @@ def launch_gui():
         if results:
             df = pd.DataFrame(results)
 
+            # Cohérence du format dans le lot : refuser un dossier mixte.
+            # L'index Excel mélangerait sinon des libellés hétérogènes
+            # (ex. "loop0, loop1, 0nm, 250nm") sans aucun sens métier.
+            formats = df['format'].dropna().unique()
+            if len(formats) > 1:
+                log_box.config(state="normal")
+                log_box.tag_config("error", foreground="red")
+                log_box.insert("end",
+                    f"\nErreur : le dossier mélange plusieurs formats de fichiers "
+                    f"({', '.join(formats)}). Export annulé pour préserver la "
+                    f"cohérence du tableau récapitulatif.\n", ("error",))
+                log_box.config(state="disabled")
+                return
+            file_format = formats[0]
+
+            # Détection de doublons (iteration_label, canal, variante) : si
+            # plusieurs fichiers produisent la même combinaison, `groupby.first()`
+            # n'en garde silencieusement qu'un. On compte les valeurs non-nulles
+            # par (itération, mesure) ; tout compte > 1 trahit un doublon.
+            measure_cols = [c for c in df.columns
+                            if c not in ('format', 'iteration_key', 'iteration_label')]
+            counts_per_iter = df.groupby('iteration_label')[measure_cols].count()
+            if (counts_per_iter > 1).any().any():
+                log_box.config(state="normal")
+                log_box.tag_config("error", foreground="red")
+                log_box.insert("end",
+                    "\nAvertissement : doublons détectés sur certaines combinaisons "
+                    "(itération, canal, variante). Seule la première occurrence est "
+                    "conservée — vérifier le contenu du dossier source.\n", ("error",))
+                log_box.config(state="disabled")
+
+            # La colonne 'format' a servi à la validation : on la retire
+            # maintenant pour qu'elle ne pollue pas le pivot final.
+            df = df.drop(columns=['format'])
+
             # Regroupement par itération : chaque combinaison (canal, variante)
             # devient une colonne distincte ; l'itération devient l'index de
             # ligne du tableau final.
@@ -573,7 +618,11 @@ def launch_gui():
             df_grouped.columns = pd.MultiIndex.from_tuples(new_cols, names=["Canal", "Variante", "Mesure"])
 
             excel_path = os.path.join(outputFolder, folderName + ".xlsx")
-            df_grouped.to_excel(excel_path, index=True, index_label="Itération")
+            # Le libellé de l'index dépend du format détecté : "Itération"
+            # pour loops (loop0, loop1, …), "Concentration" pour dosage
+            # (0nm, 250nm, …).
+            index_label = "Concentration" if file_format == 'dosage' else "Itération"
+            df_grouped.to_excel(excel_path, index=True, index_label=index_label)
 
             log_box.config(state="normal")
             duration = time.time() - start_time

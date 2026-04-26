@@ -47,7 +47,8 @@ Ce script automatise ces étapes sur un lot de fichiers. Il s'appuie sur :
 - Lissage Savitzky-Golay (fenêtre 11, ordre 2).
 - Détection du pic dans la région centrale du scan, avec filtre de pente.
 - Correction de baseline **asPLS Whittaker** avec zone d'exclusion centrée sur le pic.
-- **Export global** : un classeur Excel `.xlsx` agrégeant les pics corrigés de tous les fichiers, avec en-tête hiérarchique à trois niveaux (Canal / Fréquence / Mesure) et une ligne par itération.
+- **Deux formats de noms de fichiers** supportés (détection automatique fichier par fichier) : *loops* (suffixe `_loopZZ`) et *dosage* (préfixe d'ordre + concentration). Cf. [Format des fichiers d'entrée](#format-des-fichiers-dentrée).
+- **Export global** : un classeur Excel `.xlsx` agrégeant les pics corrigés de tous les fichiers, avec en-tête hiérarchique à trois niveaux (Canal / Variante / Mesure) et une ligne par itération (loop) ou par concentration selon le format.
 - **Exports optionnels par fichier** : graphique PNG 300 dpi, CSV ou XLSX nettoyé.
 - Journal de traitement et barre de progression en temps réel.
 - Bouton « Ouvrir le dossier de résultats » en fin de traitement.
@@ -123,7 +124,9 @@ Un fichier [`.vscode/settings.json`](.vscode/settings.json) pointe également l'
 
 ### Nommage
 
-Chaque fichier `.txt` **doit** respecter le motif suivant :
+L'outil reconnaît **deux formats** de noms de fichiers, détectés automatiquement fichier par fichier (le format `loops` est testé en premier car plus restrictif ; `dosage` sert ensuite de fallback).
+
+#### Format `loops` — itérations sur une même condition
 
 ```
 <n'importe-quoi>_XX_SWV_CYY_loopZZ.txt
@@ -140,9 +143,37 @@ Exemples valides :
 ```
 echantillon_A_05_SWV_C00_loop1.txt
 run2_15_SWV_C12_loop10.txt
+i-t 3-CypA_01_SWV_C09_loop37.txt
 ```
 
-> ⚠️ Tout fichier ne respectant pas ce motif est **silencieusement ignoré**. Pensez à vérifier le nommage si aucun résultat n'apparaît pour certains fichiers.
+#### Format `dosage` — série de concentrations
+
+```
+ZZ_<concentration>_XX_SWV_CYY.txt
+```
+
+| Groupe          | Signification                                                         | Exemple    |
+|-----------------|-----------------------------------------------------------------------|------------|
+| `ZZ`            | Préfixe numérique servant au tri (ordre expérimental)                 | `10`       |
+| `<concentration>` | Libellé de concentration (forme libre, ne contient pas `_`)         | `250nm`    |
+| `XX`            | Variante sur 2 chiffres (souvent un réplica)                          | `01`       |
+| `CYY`           | Identifiant de canal (C + 2 chiffres)                                 | `C05`      |
+
+Exemples valides :
+
+```
+01_0nm_01_SWV_C05.txt
+10_250nm_01_SWV_C05.txt
+13_1000nm_02_SWV_C05.txt
+```
+
+Le tri des lignes du tableau Excel final s'effectue selon le préfixe `ZZ` (numérique), **pas** selon l'ordre alphabétique du libellé de concentration : `0nm, 0.1nm, 0.25nm, …, 1000nm` apparaissent dans l'ordre expérimental.
+
+#### Règles d'inclusion
+
+> ⚠️ Tout fichier ne respectant **aucun** des deux motifs est **silencieusement ignoré**. Pensez à vérifier le nommage si aucun résultat n'apparaît pour certains fichiers.
+
+> ❌ Un dossier qui mélange les deux formats (par ex. fichiers `*_loopZZ.txt` côte à côte avec `ZZ_<conc>_*.txt`) **provoque l'annulation de l'export Excel** : le journal affiche un message d'erreur explicite et aucun classeur agrégé n'est produit. Séparer les deux types de fichiers dans des dossiers distincts.
 
 ### Contenu
 
@@ -189,16 +220,19 @@ Fichier : `<nom-du-dossier-source>.xlsx`.
 
 Structure hiérarchique (en-tête sur trois niveaux) :
 
-| Itération | Canal `C00`         |                     | Canal `C01`         |                     | … |
+| *Index*   | Canal `C00`         |                     | Canal `C01`         |                     | … |
 |-----------|---------------------|---------------------|---------------------|---------------------|---|
-|           | Fréquence `05`      |                     | Fréquence `05`      |                     |   |
+|           | Variante `05`       |                     | Variante `05`       |                     |   |
 |           | Tension (V)         | Courant (A)         | Tension (V)         | Courant (A)         |   |
-| loop1     | *v₁*                | *c₁*                | *v₁'*               | *c₁'*               |   |
-| loop2     | *v₂*                | *c₂*                | *v₂'*               | *c₂'*               |   |
+| *L₁*      | *v₁*                | *c₁*                | *v₁'*               | *c₁'*               |   |
+| *L₂*      | *v₂*                | *c₂*                | *v₂'*               | *c₂'*               |   |
 | …         | …                   | …                   | …                   | …                   |   |
 
-- **Chaque ligne** = une itération (`loopN`).
-- **Chaque bloc de deux colonnes** = un couple (canal, variante), avec tension et courant du pic corrigé.
+- **Chaque ligne** = une itération (loop) ou une concentration, selon le format détecté.
+- **Le libellé d'index varie selon le format** :
+  - format `loops` → en-tête de colonne `Itération`, valeurs `loop0, loop1, loop2, …` ;
+  - format `dosage` → en-tête de colonne `Concentration`, valeurs `0nm, 0.1nm, 250nm, …` (triées dans l'ordre expérimental, cf. [Format `dosage`](#format-dosage--série-de-concentrations)).
+- **Chaque bloc de deux colonnes** = un couple (canal, variante), avec tension et courant du pic corrigé. Selon le format, *variante* représente une fréquence (loops) ou un réplica (dosage).
 - Les colonnes sont triées naturellement par canal (`C00 → C99`), puis par variante, puis Tension avant Courant.
 
 ### Graphique PNG par fichier — optionnel
@@ -346,7 +380,10 @@ Sinon, laissez le multi-thread activé : le gain est typiquement de l'ordre du n
 ## Dépannage (FAQ)
 
 **Q. Certains fichiers sont ignorés sans message d'erreur.**
-Vérifier que leur nom respecte exactement le motif `*_XX_SWV_CYY_loopZZ.txt` (variante et canal **obligatoirement** sur deux chiffres). Tout nom non conforme est filtré silencieusement par la regex.
+Vérifier que leur nom respecte exactement **l'un** des deux motifs supportés : `*_XX_SWV_CYY_loopZZ.txt` (format `loops`) **ou** `ZZ_<concentration>_XX_SWV_CYY.txt` (format `dosage`). Variante et canal sont **obligatoirement** sur deux chiffres dans les deux cas. Tout nom ne correspondant à aucun des deux est filtré silencieusement par les regex. Cf. [Format des fichiers d'entrée](#format-des-fichiers-dentrée) pour la liste des champs et exemples.
+
+**Q. L'analyse s'arrête avec « le dossier mélange plusieurs formats de fichiers ».**
+Un même dossier ne peut pas contenir à la fois des fichiers `*_loopZZ.txt` et des fichiers `ZZ_<conc>_*.txt` : l'export Excel agrégé serait incohérent (mélange `loop0, loop1, 0nm, 250nm…`). Déplacer les deux types dans des dossiers distincts et relancer l'analyse séparément.
 
 **Q. Erreur « UnicodeDecodeError » à la lecture.**
 Le script force l'encodage `latin1`. Si vos fichiers sont en UTF-8 avec BOM ou autre encodage exotique, adapter le paramètre `encoding` dans [`readFile`](__main__.py).
