@@ -97,7 +97,7 @@ def open_folder(path):
         path (str): Chemin absolu du dossier à ouvrir.
     """
     if platform.system() == "Windows":
-        os.startfile(path)
+        os.startfile(path)  # type: ignore
     elif platform.system() == "Darwin":  # macOS
         subprocess.call(["open", path])
     else:  # Linux
