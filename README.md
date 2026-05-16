@@ -39,6 +39,8 @@ Pour exploiter le pic, il faut :
 - **Savitzky-Golay** pour le lissage (convolution polynomiale locale) ;
 - **asPLS Whittaker** (*asymmetric Penalized Least Squares*, bibliothèque [`pybaselines`](https://pybaselines.readthedocs.io/)) pour l'estimation robuste de la baseline, avec une pondération réduite autour du pic afin d'éviter que la baseline ne « suive » et n'efface le pic.
 
+> **Convention de signe.** Le pipeline est calibré pour des **SWV cathodiques** : `processData` inverse systématiquement le signe du courant avant `argmax`, donc le pic doit apparaître **en courant négatif** dans le fichier d'entrée. Un fichier où le pic est déjà en courant positif (orientation anodique) sera mal traité — il faut alors inverser la colonne en amont.
+
 `voltapeak_loops` cible les **plans d'expérience structurés** où plusieurs scans sont accumulés selon une dimension expérimentale — itérations dans le temps (*loops*) ou paliers de concentration (*dosage*). Le format des noms de fichiers porte cette information ; l'outil détecte automatiquement la convention utilisée et produit un classeur Excel à **en-tête hiérarchique sur trois niveaux** (Canal / Variante / Mesure). Pour l'exploration interactive d'un seul fichier, utiliser [`voltapeak`](https://github.com/scadinot/voltapeak) ; pour le simple traitement par lot multi-électrodes sans dimension expérimentale supplémentaire, utiliser [`voltapeak_batch`](https://github.com/scadinot/voltapeak_batch).
 
 ---
@@ -92,7 +94,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-> [`requirements.txt`](requirements.txt) verrouille les versions au niveau patch (`~=X.Y.Z`) — reproductibilité garantie sur les correctifs de sécurité, sans casse possible sur un changement mineur ou majeur. Le projet n'a pas de `pyproject.toml` : la configuration de chaque outil de lint / typecheck vit dans son fichier dédié ([`ruff.toml`](ruff.toml), [`.pylintrc`](.pylintrc), [`mypy.ini`](mypy.ini), [`pyrightconfig.json`](pyrightconfig.json)).
+> [`requirements.txt`](requirements.txt) borne les mises à jour aux versions de patch (`~=X.Y.Z`) : un `pip install` ultérieur peut prendre un correctif plus récent, mais ne franchira jamais un changement de version mineur ou majeur susceptible de casser le code. Pour une reproductibilité stricte (mêmes versions exactes sur toutes les machines, dans le temps), figer les versions (`==X.Y.Z`) ou ajouter un lock file (`pip-tools`, `uv`). Le projet n'a pas de `pyproject.toml` : la configuration de chaque outil de lint / typecheck vit dans son fichier dédié ([`ruff.toml`](ruff.toml), [`.pylintrc`](.pylintrc), [`mypy.ini`](mypy.ini), [`pyrightconfig.json`](pyrightconfig.json)).
 
 ---
 
@@ -115,7 +117,7 @@ python -m voltapeak_loops
 | Nombre de colonnes       | ≥ 2 (seules les 2 premières sont lues)                       |
 | Première ligne           | en-tête — **ignorée** (`skiprows=1`)                         |
 | Colonne 1                | Potentiel en volts (float)                                   |
-| Colonne 2                | Courant en ampères (float, signe indifférent)                |
+| Colonne 2                | Courant en ampères — **pic attendu en valeur négative** (convention SWV cathodique : le pipeline inverse le signe avant `argmax`) |
 | Séparateur de colonnes   | configurable : tabulation / virgule / point-virgule / espace |
 | Séparateur décimal       | configurable : point / virgule                               |
 | Nombre minimal de lignes | 5 (pour permettre le lissage)                                |
@@ -358,11 +360,11 @@ L'option *Mode de traitement → Désactiver (traitement séquentiel)* exécute 
 | L'analyse s'arrête avec « le dossier mélange plusieurs formats de fichiers » | Mix de fichiers *loops* et *dosage* dans le même dossier | Séparer les deux types dans des dossiers distincts |
 | `Erreur dans le fichier … : Error tokenizing data` | Mauvais séparateur de colonnes | Choisir le bon séparateur dans la GUI |
 | Toutes les valeurs sont lues comme chaînes ou zéro | Mauvais séparateur décimal | Basculer entre *Point* et *Virgule* |
+| Pic « inversé » ou détecté loin du sommet visible | Fichier avec pic déjà en courant positif (orientation anodique) | Pré-inverser la colonne courant en amont — le pipeline attend une convention cathodique (cf. [Format des fichiers d'entrée](#format-des-fichiers-dentrée)) |
 | Le pic détecté est sur un bord | Bruit important aux extrémités | Augmenter `marginRatio` dans le code |
 | La baseline épouse le pic | `lambdaFactor` trop bas ou zone d'exclusion trop étroite | Augmenter `lambdaFactor` ou `exclusionWidthRatio` |
 | Les graphiques PNG ne sont pas générés | Option *Export des graphiques* sur *Ne pas exporter* (défaut) | Basculer sur *.png* dans la GUI |
 | Le bouton *Ouvrir le dossier de résultats* reste grisé | Aucun fichier valide traité | Vérifier les nommages et le contenu du dossier |
-| Erreur `UnicodeDecodeError` à la lecture | Fichier en UTF-8 avec BOM ou caractères non latin-1 | Convertir temporairement le fichier en latin-1 |
 | Crash au démarrage sous Linux (`ModuleNotFoundError: _tkinter`) | Tkinter non installé | `sudo apt install python3-tk` |
 
 ---
