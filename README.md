@@ -6,7 +6,7 @@ Outil graphique (Tkinter) de **traitement par lot** de fichiers de voltammétrie
 
 ## Table des matières
 
-1. [À quoi sert cet outil ?](#à-quoi-sert-cet-outil-)
+1. [À quoi sert cet outil ?](#à-quoi-sert-cet-outil)
 2. [Fonctionnalités](#fonctionnalités)
 3. [Prérequis](#prérequis)
 4. [Installation](#installation)
@@ -120,7 +120,7 @@ python -m voltapeak_loops
 | Colonne 2                | Courant en ampères — **pic attendu en valeur négative** (convention SWV cathodique : le pipeline inverse le signe avant `argmax`) |
 | Séparateur de colonnes   | configurable : tabulation / virgule / point-virgule / espace |
 | Séparateur décimal       | configurable : point / virgule                               |
-| Nombre minimal de lignes | 5 (pour permettre le lissage)                                |
+| Nombre minimal de lignes | 11 (fenêtre Savitzky-Golay fixe — `savgol_filter` lève une exception en dessous) |
 
 ### Conventions de nommage
 
@@ -159,7 +159,7 @@ Le tri des lignes du tableau Excel final s'effectue selon le préfixe `ZZ` (num�
 
 #### Règles d'inclusion
 
-> ⚠️ Tout fichier ne respectant **aucun** des deux motifs est **silencieusement ignoré**. Vérifier le nommage si certains fichiers n'apparaissent pas dans les résultats.
+> ⚠️ Tout fichier ne respectant **aucun** des deux motifs est **ignoré** (une ligne `« Fichier ignoré ou invalide : <nom> »` apparaît dans le journal de traitement). Vérifier le nommage si certains fichiers n'apparaissent pas dans les résultats.
 
 > ❌ Un dossier qui mélange les deux formats provoque l'**annulation de l'export Excel** : le journal affiche un message d'erreur explicite et aucun classeur agrégé n'est produit. Séparer les deux types de fichiers dans des dossiers distincts.
 
@@ -203,9 +203,14 @@ La fenêtre principale s'organise ainsi :
 <dossier_entrée> (results)  ← sortie générée
 ```
 
-### Classeur Excel agrégé — toujours produit
+### Classeur Excel agrégé
 
-Fichier : `<nom_du_dossier>.xlsx`. Structure hiérarchique sur trois niveaux :
+Fichier : `<nom_du_dossier>.xlsx`. **Produit lorsque deux conditions sont réunies** :
+
+1. au moins un fichier valide a été traité avec succès (sinon aucun classeur n'est écrit) ;
+2. tous les fichiers détectés appartiennent au **même format** (loops *ou* dosage). En cas de mélange, un message d'erreur est journalisé et l'export est annulé.
+
+Lorsque ces conditions sont remplies, la structure obtenue est hiérarchique sur trois niveaux :
 
 | *Index*   | Canal `C00`         |                     | Canal `C01`         |                     | … |
 |-----------|---------------------|---------------------|---------------------|---------------------|---|
@@ -336,7 +341,7 @@ main()
 ## Performance et multiprocessing
 
 - Par défaut, le script utilise `multiprocessing.Pool(processes=cpu_count())` : **tous les cœurs CPU** sont sollicités.
-- `Pool.imap` (et non `Pool.map`) est volontairement choisi : les résultats sont **restitués au fil de l'eau**, ce qui permet de rafraîchir la barre de progression et le journal pendant le traitement.
+- `Pool.imap` (et non `Pool.map`) est volontairement choisi : les résultats sont **restitués au fil de l'eau dans l'ordre des fichiers d'entrée**, ce qui permet de rafraîchir la barre de progression et le journal pendant le traitement, sans attendre la fin du lot.
 - Le backend matplotlib `'Agg'` (non-interactif) est **obligatoire** : les processus enfants du pool n'ont pas accès au thread Tk.
 
 ### Mode séquentiel (option *Désactiver*)
@@ -345,8 +350,7 @@ L'option *Mode de traitement → Désactiver (traitement séquentiel)* exécute 
 
 - vous **déboguez** le pipeline : les exceptions des workers sont parfois absorbées par le pool et difficiles à tracer ;
 - l'**export PNG matplotlib** se comporte mal sur votre installation (anciens drivers graphiques, conflits de backend) ;
-- vous tournez sur un environnement **contraint** (machine virtuelle à 1 vCPU, sandbox CI) où le `Pool` apporte un surcoût sans gain réel ;
-- vous voulez observer les fichiers traités **dans l'ordre** (en parallèle, l'ordre d'arrivée des résultats est non déterministe).
+- vous tournez sur un environnement **contraint** (machine virtuelle à 1 vCPU, sandbox CI) où le `Pool` apporte un surcoût sans gain réel.
 
 `freeze_support()` est appelé dans `main()` pour permettre un éventuel packaging PyInstaller sous Windows.
 
@@ -356,7 +360,7 @@ L'option *Mode de traitement → Désactiver (traitement séquentiel)* exécute 
 
 | Symptôme | Cause probable | Solution |
 |---|---|---|
-| Certains fichiers sont ignorés sans message d'erreur | Nom ne respectant aucun des deux motifs supportés | Vérifier le nommage — variante et canal **obligatoirement** sur 2 chiffres |
+| Certains fichiers sont ignorés (ligne `« Fichier ignoré ou invalide »` dans le journal) | Nom ne respectant aucun des deux motifs supportés | Vérifier le nommage — variante et canal **obligatoirement** sur 2 chiffres |
 | L'analyse s'arrête avec « le dossier mélange plusieurs formats de fichiers » | Mix de fichiers *loops* et *dosage* dans le même dossier | Séparer les deux types dans des dossiers distincts |
 | `Erreur dans le fichier … : Error tokenizing data` | Mauvais séparateur de colonnes | Choisir le bon séparateur dans la GUI |
 | Toutes les valeurs sont lues comme chaînes ou zéro | Mauvais séparateur décimal | Basculer entre *Point* et *Virgule* |
